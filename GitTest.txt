@@ -1,0 +1,32 @@
+declare
+     @res    int           -- для Return-кодов вызываемых процедур.
+    ,@ret    int           -- для хранения Return-кода данной процедуры.
+    ,@err    int           -- для хранения @@error-кода после вызовов процедур.
+    ,@cnt    int           -- для хранения количеств обрабатываемых записей.
+    ,@ErrMsg varchar(1000) -- для формирования сообщений об ошибках
+    ,@true   bool = cast(1 as bit)
+    ,@false  bool = cast(0 as bit)
+    ,@MemberTypeID     typeid = dbo.[oid.TypeID](@MemberOID)
+    ,@MemberInstanceID instanceid = dbo.[oid.InstanceID](@MemberOID)
+    ,@CustNo int
+
+  select  
+      @CustNo = cla.CustNo
+    from gms.Member as t
+    inner join dbo.ClientLnkAM as cla on cla.[OID.TypeID] = t.[PersonOID.TypeID]
+                                     and cla.[OID.InstanceID] = t.[PersonOID.InstanceID]
+  where t.[OID.TypeID] = @MemberTypeID
+    and t.[OID.InstanceID] = @MemberInstanceID
+
+  exec @res = FinanceDB.dbo.mm_sms_auth_code_list 
+     @cust_id = @CustNo
+    ,@is_only_get_code = 0
+  select @err = @@error
+  if (@res < 0 or @err != 0) begin
+    select @ret = case when @res = 0 then @err else @res end
+    --/*[+debug]
+      select @Log_RCount = @cnt, @Log_Comment = 'return (' + master.dbo.fn_dbg_Int(@ret) + '). ERROR_ON /exec [dbo].FinanceDB.dbo.mm_sms_auth_code_list/; ret (' + master.dbo.fn_dbg_Int(@res) + ')' + isnull('; Error (' + convert(varchar(10), nullif(@err,0))+ ').', '.')
+      exec dbo.[LogData.Save] @Log_SessionID, @log_sesid, @@procid, @Log_RCount, @Log_Comment, @debug_info, @debug_shift out, @Log_dtBgn out, @Log_dtSubaction out, @Log_@dtAction out, 1, 1, @ret
+    --[-debug]*/
+    return (@ret)
+  end
